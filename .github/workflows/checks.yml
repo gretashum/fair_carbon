@@ -1,0 +1,58 @@
+name: Continuous integration
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+# template mostly borrowed from openscm-runner
+# https://github.com/openscm/openscm-runner
+
+jobs:
+  all:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Setup python
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dev dependencies
+      run: |
+        pip install --upgrade pip wheel
+        pip install -e .[dev-nodocs]
+    - name: Formatting and linters
+      run: |
+        bandit -c .bandit.yml -r src/fair
+        black --check src setup.py --exclude fair/_version.py
+        isort --check-only --quiet --recursive src setup.py
+        pydocstyle src
+        flake8 src setup.py
+#        pylint src
+# test readthedocs build... how?
+
+    - name: Test with pytest
+      env:
+        MIN_COVERAGE: 90
+      run: |
+          pytest tests -r a --cov=./src/fair --cov-report=xml
+          if ! coverage report --fail-under=${MIN_COVERAGE} --show-missing
+          then
+              echo
+              echo "Error: Test coverage has to be at least ${MIN_COVERAGE}"
+              exit 1
+          fi
+      # we could run the notebook tests, but we probably don't want to do this every
+      # time and use all our minutes.
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        verbose: true
+        file: ./coverage.xml

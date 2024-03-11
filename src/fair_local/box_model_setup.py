@@ -1,6 +1,6 @@
 #!/bin/env python 
 
-def configure(beta_550 = 1.2,
+def configure(beta_550 = 1.3,
               Q10_resp=1.6,
               kwScalar=1, 
               PsiScalar=1, 

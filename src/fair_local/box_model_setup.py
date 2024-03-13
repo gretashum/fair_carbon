@@ -95,7 +95,7 @@ def configure(beta_550 = 1.3,
 #     PS['dPsidb'] = dPsidb #0.2 # default is 1/3, can be modified to turn the climate response of ocean circulation up or down (try 0-0.5)
 
     ##### Choose an emissions scheme by specifing the co2 scenario 
-    PS['escheme'] = 'flat10_zec' #'hist_gcb'
+    PS['escheme'] = 'hist_gcb'# 'flat10_zec'
     PS['runName'] = '%s' % (PS['escheme'])
 
 
@@ -549,6 +549,7 @@ def configure(beta_550 = 1.3,
 
     # PO4
     Amat = Psi + PO['Qup'] + PO['Qrem']
+#     print(Amat)
     Amat[-1, :] = V / np.sum(V)
     b = np.zeros((1,PE['nb']))
     b[0, -1] = Pbar

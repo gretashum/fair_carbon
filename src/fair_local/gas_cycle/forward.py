@@ -95,6 +95,11 @@ def step_concentration(
     return concentration_out, gasboxes_new, airborne_emissions_new, flux_new
 
 def step_concentration_gems(
+    gems_beta_550,
+    gems_Q10_resp,
+    gems_kwScalar,
+    gems_PsiScalar,
+    gems_dPsidb,
     i_timepoint,
     emissions,
     gasboxes_old,
@@ -172,12 +177,15 @@ def step_concentration_gems(
     from scipy import integrate
     from ..box_model_functions import co2_emissions_gems, calc_pco2, get_matrix_index, carbon_climate_derivs
     from ..box_model_setup import configure, runSD
+    
 
-    print(i_timepoint, 'gasboxes_old', gasboxes_old)
 #     configure the Swann Model:
-    PE, PS, PL, PO = configure()
-
-    print('emissions: ', emissions[:,:][0][0][0][0][0])
+#     PE, PS, PL, PO = configure()
+    PE, PS, PL, PO = configure(beta_550 = gems_beta_550,
+                               Q10_resp = gems_Q10_resp,
+                               kwScalar = gems_kwScalar,
+                               PsiScalar = gems_PsiScalar, 
+                               dPsidb = gems_dPsidb,)
     emissions = emissions
 
     
@@ -214,35 +222,30 @@ def step_concentration_gems(
 #     integrate forward
     # convert matrix of initial values to a vector (required for ode solver)
     y0=y0mat.flatten()[PE['Ires']].reshape(1, len(PE['Ires']))
-    print('y0 = ', y0)
 
     spery = PE['spery']
     emit = emissions/ 44.009 * 12.011
-    print(emit)
-
 
 #     read in temperature from FaIR:
-    print(temperature)
     temp = np.squeeze(np.array(temperature))
-    print(i_timepoint, 'np.shape(temp) = ', np.shape(temp))
-    print(i_timepoint, 'temp = ', temp)    
     
     if i_timepoint == 0:
         gasboxes = y0
         
         T = np.zeros_like(np.array([PE['Jtmp'],PE['Jtmp']]))
         T[0] = np.squeeze(gasboxes)[PE['Jtmp']].transpose()
-        print(i_timepoint, 'np.shape(T[0]) = ', np.shape(T[0]))
+#         T[1] = np.squeeze(gasboxes)[PE['Jtmp']].transpose()
 
         trun = np.arange(0, (5000)*PE['spery'], PE['spery'])
         new_deriv = partial(carbon_climate_derivs, PE=PE, PS=PS, PL=PL, PO=PO, emit = 0, temperature = T)
         sol = integrate.solve_ivp(new_deriv, t_span = [trun[0],trun[-1]], y0=np.squeeze(gasboxes), method='BDF',t_eval=trun)
-#         sol = sol.y[:,-1]
         y = np.squeeze(sol.y[:,-1])
-        print(i_timepoint, 'y = ', y)
-
+        
+        t_span = [(5000+i_timepoint)*spery,(5000+i_timepoint+1)*spery]
+        new_deriv = partial(carbon_climate_derivs, PE=PE, PS=PS, PL=PL, PO=PO, emit = emit, temperature = T)
+        sol = integrate.solve_ivp(new_deriv, t_span = t_span, y0=np.squeeze(y), method='BDF',t_eval=np.array([(5000+i_timepoint+1)*spery]))
+        
     else:
-        print(i_timepoint, 'temp = ', temp)
         T = np.zeros_like(np.array([PE['Jtmp'],PE['Jtmp']]))
         for i in PE['Jtmp']:
             T[0][i] = temp[0][0]
@@ -253,21 +256,14 @@ def step_concentration_gems(
         T[1][5] = temp[1][1]
         T[0][6] = temp[0][2]
         T[1][6] = temp[1][2]
-        t_span = [(5000+i_timepoint)*spery,(5000+i_timepoint+1)*spery]
-        print(i_timepoint, 'gasboxes_old:', gasboxes_old)
+        t_span = [(5001+i_timepoint)*spery,(5001+i_timepoint+1)*spery]
         gasboxes = np.array(gasboxes_old[...,:])
-        print(i_timepoint, 'gasboxes:', gasboxes)
         
         new_deriv = partial(carbon_climate_derivs, PE=PE, PS=PS, PL=PL, PO=PO, emit = emit, temperature = T)
-        sol = integrate.solve_ivp(new_deriv, t_span = t_span, y0=np.squeeze(gasboxes), method='BDF',t_eval=np.array([(5000+i_timepoint+1)*spery]))
-        print(i_timepoint, ': sol = ', np.shape(sol))
+        sol = integrate.solve_ivp(new_deriv, t_span = t_span, y0=np.squeeze(gasboxes), method='BDF',t_eval=np.array([(5001+i_timepoint+1)*spery]))
 
-
-        y = np.squeeze(sol.y)
-      
-    
+    y = np.squeeze(sol.y)
     gasboxes_new = y.flatten()# * 44.009 / 12.011
-    print(i_timepoint, 'gasboxes_new =', gasboxes_new)
     concentration_out = y.flatten()[-1] * 1e6 #* PE['ma'] * 12e-15 * 44.009 / 12.011
     airborne_emissions_new = y[-1] * 1e6 *2.12 * 44.009 / 12.011 #* PE['ma'] * 12e-15 * 44.009 / 12.011
     

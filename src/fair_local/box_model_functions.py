@@ -224,7 +224,7 @@ def carbon_climate_derivs(t, y, PE, PS, PL, PO, emit, temperature):
     # time
     ymod = t / PE['spery'] # year in model time (starting from 0)
     ycal = ymod - PS['yspin'] + 5000 #PS['ypert'] # calendar year (negative means "BCE") # GEMS TODO maybe later want to make ypert an input too configure and just set PS['ypert'] to 5000 by default
-    if ycal < PS['ypert']:
+    if ycal < 5000: #PS['ypert']:
         doAtm = 0 # hold atmospheric co2 constant to equilibrate
     else:
         doAtm = 1 # allow atmospheric co2 to evolve

@@ -464,7 +464,19 @@ class FAIR:
                   "gasbox"),
         )
         # greta mod
-
+        # greta mod:
+        # carbon configs
+        self.carbon_configs = xr.Dataset(
+            {
+                "gems_beta_550": ("config", np.ones(self._n_configs) * np.nan),
+                "gems_Q10_resp": ("config", np.ones(self._n_configs) * np.nan),
+                "gems_kwScalar": ("config", np.ones(self._n_configs) * np.nan),
+                "gems_PsiScalar": ("config", np.ones(self._n_configs) * np.nan),
+                "gems_dPsidb": ("config", np.ones(self._n_configs) * np.nan),
+            },
+            coords={"config": self.configs,},
+        )
+#         greta mod
         # climate configs
         self.climate_configs = xr.Dataset(
             {
@@ -618,6 +630,32 @@ class FAIR:
                     ["config"],
                     np.ones((self._n_configs)) * np.nan,
                 ),
+#                 gems
+                "gems_beta_550": (
+                    ["config"],
+                    np.ones((self._n_configs)) * np.nan,
+                ),
+                "gems_Q10_resp": (
+                    ["config"],
+                    np.ones((self._n_configs)) * np.nan,
+                ),
+                "gems_kwScalar": (
+                    ["config"],
+                    np.ones((self._n_configs)) * np.nan,
+                ),
+                "gems_kwScalar": (
+                    ["config"],
+                    np.ones((self._n_configs)) * np.nan,
+                ),
+                "gems_PsiScalar": (
+                    ["config"],
+                    np.ones((self._n_configs)) * np.nan,
+                ),
+                "gems_dPsidb": (
+                    ["config"],
+                    np.ones((self._n_configs)) * np.nan,
+                ),
+#                 gems
             },
             coords={
                 "config": self.configs,
@@ -657,6 +695,33 @@ class FAIR:
                 df.loc[specie].forcing_scale,
                 specie=specie,
             )
+# #             gems add:
+#             fill(
+#                 self.species_configs["gems_beta_550"],
+#                 df.loc[specie].gems_beta_550,
+#                 specie=specie,
+#             )
+#             fill(
+#                 self.species_configs["gems_Q10_resp"],
+#                 df.loc[specie].gems_Q10_resp,
+#                 specie=specie,
+#             )
+#             fill(
+#                 self.species_configs["gems_kwScalar"],
+#                 df.loc[specie].gems_kwScalar,
+#                 specie=specie,
+#             )
+#             fill(
+#                 self.species_configs["gems_PsiScalar"],
+#                 df.loc[specie].gems_PsiScalar,
+#                 specie=specie,
+#             )
+#             fill(
+#                 self.species_configs["gems_dPsidb"],
+#                 df.loc[specie].gems_dPsidb,
+#                 specie=specie,
+#             )
+# #             gems add
             for gasbox in range(self._n_gasboxes):
                 if filename != DEFAULT_SPECIES_CONFIG_FILE:
                     try:
@@ -1461,7 +1526,9 @@ class FAIR:
             dtype=bool,
         )
 
-    def run(self, progress=True, suppress_warnings=True):
+    def run(self, progress=True, suppress_warnings=True, 
+            SD_params = None # GEMS
+           ):
         """Run the FaIR model.
 
         Parameters
@@ -1583,6 +1650,12 @@ class FAIR:
         ].data
         partition_fraction_array = self.species_configs["partition_fraction"].data
         unperturbed_lifetime_array = self.species_configs["unperturbed_lifetime"].data
+        
+        gems_beta_550_array=self.carbon_configs["gems_beta_550"].data
+        gems_Q10_resp_array=self.carbon_configs["gems_Q10_resp"].data
+        gems_kwScalar_array=self.carbon_configs["gems_kwScalar"].data
+        gems_PsiScalar_array=self.carbon_configs["gems_PsiScalar"].data
+        gems_dPsidb_array=self.carbon_configs["gems_dPsidb"].data
 
         if self._routine_flags["temperature"]:
             eb_matrix_d_array = self.ebms["eb_matrix_d"].data
@@ -1687,6 +1760,7 @@ class FAIR:
 
                  # 3. greenhouse emissions to concentrations; include methane from IIRF
                 if self.co2_method == 'swann2010':
+#                     first, use default step_concentration to compute other ghgs
                     (
                         concentration_array[
                             i_timepoint + 1 : i_timepoint + 2,
@@ -1742,6 +1816,7 @@ class FAIR:
                         ],
                         self.timestep,
                     )
+#                     second, use default step_concentration_gsm to compute other co2 carbon cycle
                     for j_config in range(self._n_configs):
                         (
                             concentration_array[
@@ -1760,6 +1835,11 @@ class FAIR:
                                 self._co2_indices,
                             ],
                         ) = step_concentration_gems(
+                            gems_beta_550 = gems_beta_550_array[j_config : j_config + 1,],
+                            gems_Q10_resp = gems_Q10_resp_array[j_config : j_config + 1,],
+                            gems_kwScalar = gems_kwScalar_array[j_config : j_config + 1,],
+                            gems_PsiScalar = gems_PsiScalar_array[j_config : j_config + 1,],
+                            gems_dPsidb = gems_dPsidb_array[j_config : j_config + 1,],
                             i_timepoint = i_timepoint,
                             emissions = emissions_array[
                                 i_timepoint : i_timepoint + 1,
@@ -2198,11 +2278,17 @@ class FAIR:
         self.airborne_emissions.data = airborne_emissions_array
         self.airborne_fraction.data = airborne_fraction_array
         self.gas_partitions.data = gas_partitions_array
-        self.co2_partitions.data = co2_partitions_array
+        self.co2_partitions.data = co2_partitions_array #gems
         self.flux.data = flux_array
         self.ocean_heat_content_change.data = ocean_heat_content_change_array
         self.toa_imbalance.data = toa_imbalance_array
         self.stochastic_forcing.data = cummins_state_array[..., 0]
+#         adding SD variables
+        self.carbon_configs.gems_beta_550.data = gems_beta_550_array
+        self.carbon_configs.gems_Q10_resp.data = gems_Q10_resp_array
+        self.carbon_configs.gems_kwScalar.data = gems_kwScalar_array
+        self.carbon_configs.gems_PsiScalar.data = gems_PsiScalar_array
+        self.carbon_configs.gems_dPsidb.data = gems_dPsidb_array
 
     def to_netcdf(self, filename):
         """Write out FaIR scenario data to a netCDF file.

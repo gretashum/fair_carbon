@@ -185,7 +185,8 @@ def step_concentration_gems(
                                Q10_resp = gems_Q10_resp,
                                kwScalar = gems_kwScalar,
                                PsiScalar = gems_PsiScalar, 
-                               dPsidb = gems_dPsidb,)
+                               dPsidb = gems_dPsidb,
+                               patm0 = baseline_concentration)
     emissions = emissions
 
     
@@ -200,6 +201,7 @@ def step_concentration_gems(
     rt_side = (PL['bcoef'] * PL['NPP_o']).reshape(9, 1)
     Cla_o = np.linalg.solve(lt_side, rt_side) # initial land carbon (steady state)
     Cat_o = PE['patm0'] # initial atmos. pCO2 (uatm, or ppm)
+#     print(PE['patm0'])
 
     # package initial values into array
     # this makes it easier to identify domains (rows) and pools (columns)
@@ -232,9 +234,21 @@ def step_concentration_gems(
     if i_timepoint == 0:
         gasboxes = y0
         
-        T = np.zeros_like(np.array([PE['Jtmp'],PE['Jtmp']]))
-        T[0] = np.squeeze(gasboxes)[PE['Jtmp']].transpose()
-#         T[1] = np.squeeze(gasboxes)[PE['Jtmp']].transpose()
+        T = np.squeeze(gasboxes)[PE['Jtmp']].transpose()
+        T = np.zeros_like(np.array([PE['Jtmp']])).transpose()
+#         could initialize fair with only 2 layers `f = FAIR(n_layers=2)`, but for now, have 3 and only use 0 and 1
+        T[PO['iAA']] = temp[0]
+        T[PO['iSA']] = temp[0]
+        T[PO['iNA']] = temp[0]
+        T[PO['iLL']] = temp[0]
+        T[PO['iTC']] = temp[1]
+        if len(temp) < 3:
+            T[PO['iNADW']] = temp[1]
+            T[PO['iAABW']] = temp[1]
+        else:
+            T[PO['iNADW']] = temp[2]
+            T[PO['iAABW']] = temp[2]
+
 
         trun = np.arange(0, (5000)*PE['spery'], PE['spery'])
         new_deriv = partial(carbon_climate_derivs, PE=PE, PS=PS, PL=PL, PO=PO, emit = 0, temperature = T)
@@ -244,25 +258,32 @@ def step_concentration_gems(
         t_span = [(5000+i_timepoint)*spery,(5000+i_timepoint+1)*spery]
         new_deriv = partial(carbon_climate_derivs, PE=PE, PS=PS, PL=PL, PO=PO, emit = emit, temperature = T)
         sol = integrate.solve_ivp(new_deriv, t_span = t_span, y0=np.squeeze(y), method='BDF',t_eval=np.array([(5000+i_timepoint+1)*spery]))
+        y = np.squeeze(sol.y[:,-1])
         
     else:
-        T = np.zeros_like(np.array([PE['Jtmp'],PE['Jtmp']]))
-        for i in PE['Jtmp']:
-            T[0][i] = temp[0][0]
-            T[1][i] = temp[1][0]
-        T[0][4] = temp[0][1]
-        T[0][5] = temp[0][1]
-        T[1][4] = temp[1][1]
-        T[1][5] = temp[1][1]
-        T[0][6] = temp[0][2]
-        T[1][6] = temp[1][2]
+        T = np.zeros_like(np.array([PE['Jtmp']])).transpose()
+#         could initialize fair with only 2 layers `f = FAIR(n_layers=2)`, but for now, have 3 and only use 0 and 1
+        T[PO['iAA']] = temp[0]
+        T[PO['iSA']] = temp[0]
+        T[PO['iNA']] = temp[0]
+        T[PO['iLL']] = temp[0]
+        T[PO['iTC']] = temp[1]
+        T[PO['iNADW']] = temp[2]
+        T[PO['iAABW']] = temp[2]
+
         t_span = [(5001+i_timepoint)*spery,(5001+i_timepoint+1)*spery]
-        gasboxes = np.array(gasboxes_old[...,:])
+        gasboxes = np.squeeze(np.array(gasboxes_old[...,:]))
+#         print(np.shape(gasboxes))
+#         print(np.shape(temp))
+        gasboxes[PO['Isfc']] = temp[0]
+        gasboxes[PO['iTC']] = temp[1]
+        gasboxes[PO['iNADW']] = temp[2]
+        gasboxes[PO['iAABW']] = temp[2]
         
         new_deriv = partial(carbon_climate_derivs, PE=PE, PS=PS, PL=PL, PO=PO, emit = emit, temperature = T)
-        sol = integrate.solve_ivp(new_deriv, t_span = t_span, y0=np.squeeze(gasboxes), method='BDF',t_eval=np.array([(5001+i_timepoint+1)*spery]))
+        sol = integrate.solve_ivp(new_deriv, t_span = t_span, y0=gasboxes, method='BDF',t_eval=np.array([(5001+i_timepoint+1)*spery]))
+        y = np.squeeze(sol.y)
 
-    y = np.squeeze(sol.y)
     gasboxes_new = y.flatten()# * 44.009 / 12.011
     concentration_out = y.flatten()[-1] * 1e6 #* PE['ma'] * 12e-15 * 44.009 / 12.011
     airborne_emissions_new = y[-1] * 1e6 *2.12 * 44.009 / 12.011 #* PE['ma'] * 12e-15 * 44.009 / 12.011

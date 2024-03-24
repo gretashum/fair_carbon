@@ -4,16 +4,18 @@ def configure(beta_550 = 1.3,
               Q10_resp=1.6,
               kwScalar=1, 
               PsiScalar=1, 
-              dPsidb=1/3):
+              dPsidb=1/3,
+              patm0 = 284.7,):
     '''
     Function to configure PE, PS, PL, PO for carbon_climate_derivs
     Choose some parameters:
     defaults:
         beta_550 = 1.3,
-        Q10_resp=1.6,
-        kwScalar=1, 
-        PsiScalar=1, 
-        dPsidb=1/3
+        Q10_resp = 1.6,
+        kwScalar = 1, 
+        PsiScalar = 1, 
+        dPsidb = 1/3,
+        patm0 = 
     '''
     
     # Import Packages
@@ -95,7 +97,7 @@ def configure(beta_550 = 1.3,
 #     PS['dPsidb'] = dPsidb #0.2 # default is 1/3, can be modified to turn the climate response of ocean circulation up or down (try 0-0.5)
 
     ##### Choose an emissions scheme by specifing the co2 scenario 
-    PS['escheme'] = 'hist_gcb'# 'flat10_zec'
+    PS['escheme'] = 'hist_gcb' #'flat10_zec'
     PS['runName'] = '%s' % (PS['escheme'])
 
 
@@ -111,10 +113,13 @@ def configure(beta_550 = 1.3,
     PE['foc'] = 1 - PE['fla'] # fraction ocean area
     PE['ps'] = 1013.5 * 1e2  # mean surface pressure (Pa)
     PE['ma'] = PE['ps'] * PE['Ae'] / 9.80 / 0.0290;   # mass of atmosphere (moles of air)
-    if PS['escheme'] == 'hist_gcb':
-        PE['patm0'] = 267.5e-6 # preindustrial co2 (atm)
-    else:
-        PE['patm0'] = 280e-6 # preindustrial co2 (atm)
+    
+    PE['patm0'] = patm0 * 1e-6 # GEMS
+    
+#     if PS['escheme'] == 'hist_gcb': # GEMS 
+#         PE['patm0'] = 267.5e-6 # preindustrial co2 (atm) # GEMS 
+#     else: # GEMS 
+#         PE['patm0'] = 280e-6 # preindustrial co2 (atm) # GEMS 
 
     # Structure and Indices of state variable arrays
     PE['nd'] = 5 # number state variable 'domains' (Oc Temp, Oc Nutr, Oc CO2, Land C, Atm)

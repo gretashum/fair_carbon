@@ -1892,7 +1892,7 @@ class FAIR:
                             ],
                             timestep = self.timestep,
                             temperature = cummins_state_array[
-                                i_timepoint - 1 : i_timepoint + 1,
+                                i_timepoint : i_timepoint + 1,
                                 ...,j_config : j_config + 1, :,
                             ]
                         )

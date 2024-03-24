@@ -184,15 +184,18 @@ def carbon_climate_derivs(t, y, PE, PS, PL, PO, emit, temperature):
     # added the necessary seawater functions to their own .py module
     from .seawater_functions import dens0, dens, seck, T68conv
     
-#     Tloc = y[PE['Jtmp']].transpose()
-    T_0 = temperature[0]
-    T_1 = temperature[1]
-    dT = T_1 - T_0
+    Tloc = y[PE['Jtmp']].transpose() #orig
+#     T_0 = temperature[0]
+#     T_1 = temperature[1]
+#     dT = T_1 - T_0
 #     temp = np.empty_like(y[PE['Jtmp']].transpose())
 #     temp[0:4] = temperature
 #     Tloc = temp
 #     taking temperature from FaIR
-
+#     Tloc = temperature
+#     print(np.shape(y[PE['Jtmp']].transpose()))
+#     print(np.shape(Tloc))
+    
     Nloc = y[PE['Jnut']].transpose()
     Dloc = y[PE['Jcoc']].transpose()
     Cloc = y[PE['Jcla']]
@@ -245,7 +248,8 @@ def carbon_climate_derivs(t, y, PE, PS, PL, PO, emit, temperature):
     RFsto=np.interp(round(ycal),PS['Yint'].transpose(), PS['RFint'].transpose())
     RF = (RFco2 + np.nansum(RFsto)) * doAtm
 #     dTbar = np.sum(Tloc[PO['Isfc']] * PO['A'][PO['Isfc']]) / np.sum(PO['A'][PO['Isfc']]) # GMST (ocean surface = earth surface) # GEMS comment
-    dTbar = np.sum(dT[PO['Isfc']] * PO['A'][PO['Isfc']]) / np.sum(PO['A'][PO['Isfc']]) # GMST (ocean surface = earth surface) # GEMS added
+#     dTbar = np.sum(dT[PO['Isfc']] * PO['A'][PO['Isfc']]) / np.sum(PO['A'][PO['Isfc']]) # GMST (ocean surface = earth surface) # GEMS added
+    dTbar = np.sum(Tloc[PO['Isfc']] * PO['A'][PO['Isfc']]) / np.sum(PO['A'][PO['Isfc']]) # GMST (ocean surface = earth surface) # GEMS added
 
     #------ terrestrial
     NPPfac = 1 + np.interp(ycal,PS['Yint'].transpose(), PS['NPPint'].transpose())
@@ -273,14 +277,16 @@ def carbon_climate_derivs(t, y, PE, PS, PL, PO, emit, temperature):
     if PS['DoOcn'] == 1:
         Qbio = PO['Qup'] + PO['Qrem']
 #         pco2loc, pHloc, Ksol = calc_pco2(Tsol + PS['CCC_OT'] * Tloc, Ssol, TAsol, Dloc, PO['pH0']) # CO2 chemistry GEMS
-        pco2loc, pHloc, Ksol = calc_pco2(T_0 + PS['CCC_OT'] * dT, Ssol, TAsol, Dloc, PO['pH0']) # CO2 chemistry # GEMS using raw temperature from FaIR
+#         pco2loc, pHloc, Ksol = calc_pco2(T_0 + PS['CCC_OT'] * dT, Ssol, TAsol, Dloc, PO['pH0']) # CO2 chemistry # GEMS using raw temperature from FaIR
+        pco2loc, pHloc, Ksol = calc_pco2(Tsol + PS['CCC_OT'] * Tloc, Ssol, TAsol, Dloc, PO['pH0']) # CO2 chemistry GEMS
         pco2Cor = patm * PS['CCC_OC'] + PE['patm0'] * (1 - PS['CCC_OC']) # switch for ocean carbon-carbon coupling
         Fgasx = PO['kwi'] * PO['A'] * Ksol * (pco2loc - pco2Cor) # gas exchange rate
 
         # circulation change
         #rho = sw.dens(PO['S'], PO['T'] + Tloc, PO['T'] * 0).flatten() # density
 #         rho = dens(PO['S'], PO['T'] + Tloc, PO['T'] * 0).flatten() # density GEMS
-        rho = dens(PO['S'], T_1, T_0 * 0).flatten() # density # GEMS using raw T from FaIR
+#         rho = dens(PO['S'], T_1, T_0 * 0).flatten() # density # GEMS using raw T from FaIR
+        rho = dens(PO['S'], PO['T'] + Tloc, PO['T'] * 0).flatten() # density GEMS
         bbar = PO['rho_o'][6] - PO['rho_o'][2]
         db = (rho[6] - rho[2]) - bbar
         Psi = PO['Psi_o'] * (1 - PS['CCC_OT'] * PO['dPsidb'] * db / bbar)
@@ -299,7 +305,8 @@ def carbon_climate_derivs(t, y, PE, PS, PL, PO, emit, temperature):
 
     #------ Compute Tendencies - should have units mol/s
 #     dTdt = np.matmul(Psi,Tloc.transpose()) -((PO['lammbda'] / PO['V']) * Tloc).transpose() + RF / PO['cm'].transpose() ###!!! problem here too? # there's a ten year timescale to get tempreature into the ocean # GEMS comment
-    dTdt = np.matmul(Psi,dT.transpose()) -((PO['lammbda'] / PO['V']) * dT).transpose() + RF / PO['cm'].transpose() ###!!! problem here too? # there's a ten year timescale to get tempreature into the ocean # added by GEMS
+#     dTdt = np.matmul(Psi,dT.transpose()) -((PO['lammbda'] / PO['V']) * dT).transpose() + RF / PO['cm'].transpose() ###!!! problem here too? # there's a ten year timescale to get tempreature into the ocean # added by GEMS
+    dTdt = np.matmul(Psi,Tloc.transpose()) -((PO['lammbda'] / PO['V']) * Tloc).transpose() + RF / PO['cm'].transpose() ###!!! problem here too? # there's a ten year timescale to get tempreature into the ocean # GEMS comment
 
     dAdt = (1 / PE['ma']) * (np.sum(Fgasx) - NEE + FF) # mass of the atmosphere over time
 
